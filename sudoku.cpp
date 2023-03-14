@@ -1,8 +1,11 @@
 #include "sudoku.h"
 
-CellBtn::CellBtn(QWidget* parent) : QPushButton("0",parent), _digit(0),_is_open(true)
+CellBtn::CellBtn(QWidget* parent) :
+    QPushButton("0",parent),
+    _digit(0),
+    _is_open(true)
 {
-    connect(this,SIGNAL(clicked()),this,SLOT(ChangeDigit()));
+    connect(this,&CellBtn::clicked,this,&CellBtn::ChangeDigit);
     this->setStyleSheet("background-color:"+QColor(255,255,255).name());
 }
 
@@ -28,7 +31,7 @@ void CellBtn::Lock()
     if (_is_open)
     {
         _is_open = false;
-        disconnect(this,SIGNAL(clicked()),this,SLOT(ChangeDigit()));
+        setEnabled(false);
         UpdateColor();
     }
 }
@@ -38,7 +41,7 @@ void CellBtn::Open()
     if (not _is_open)
     {
         _is_open = true;
-        connect(this,SIGNAL(clicked()),this,SLOT(ChangeDigit()));
+        setEnabled(true);
         UpdateColor();
     }
 }
@@ -65,7 +68,7 @@ void CellBtn::UpdateColor()
 {
     if (IsLocked())
     {
-        this->setStyleSheet("background-color:"+QColor(255,100,100).name());
+        this->setStyleSheet("background-color:"+QColor(255,100,100).name()+";color:"+QColor(255,255,255).name());
         return;
     }
     if (_digit == 0)
@@ -77,7 +80,8 @@ void CellBtn::UpdateColor()
     this->setStyleSheet("background-color:"+QColor(213/(_digit+1),25*(_digit+1),133).name());
 }
 
-Sudoku::Sudoku(QWidget* parent) : QWidget(parent)
+Sudoku::Sudoku(QWidget* parent) :
+    QWidget(parent)
 {
     QGridLayout* main_layout = new QGridLayout(this);
     for (uint8_t i = 0; i < 9; i+=1)
@@ -97,9 +101,9 @@ Sudoku::Sudoku(QWidget* parent) : QWidget(parent)
     _check ->setText("Check");
     _solve ->setText("Get Solve");
     _return->setText("Return to Menu");
-    connect(_solve ,SIGNAL(clicked()),this,SLOT(Solve()));
-    connect(_check ,SIGNAL(clicked()),this,SLOT(Check()));
-    connect(_return,SIGNAL(clicked()),this,SLOT(ClickedReturnBtn()));
+    connect(_solve ,&QPushButton::clicked,this,&Sudoku::Solve);
+    connect(_check ,&QPushButton::clicked,this,&Sudoku::Check);
+    connect(_return,&QPushButton::clicked,this,&Sudoku::ClickedReturnBtn);
     main_layout->addWidget(_solve ,13,0,1,3);
     main_layout->addWidget(_return,13,8,1,3);
     main_layout->addWidget(_check ,13,4,1,3);
@@ -181,7 +185,7 @@ void Sudoku::Generate(uint8_t open_slots_count)
         sdk[i] = new Cell*[9] ;
         for (uint8_t j = 0; j < 9; j += 1)
         {
-            sdk[i][j] = new Cell{9};
+            sdk[i][j] = new Cell;
         }
     }
 
@@ -284,8 +288,9 @@ void Sudoku::Generate(uint8_t open_slots_count)
                 _cells[row][line]->SetDigit(0);
                 _cells[row][line]->Open();
             }
-
+            delete sdk[line][row];
         }
+        delete[] sdk[line];
     }
     delete[] opened;
     delete[] sdk;
@@ -484,8 +489,8 @@ Menu::Menu(QWidget *parent) : QWidget(parent)
     _exit   ->setText("Exit");
     _setting->setValidator(new QIntValidator(0, 100, this) );
     _setting->setAlignment(Qt::AlignmentFlag::AlignHCenter | Qt::AlignmentFlag::AlignVCenter);
-    connect(_play,SIGNAL(clicked()),this,SLOT(ClickedPlayBtn()));
-    connect(_exit,SIGNAL(clicked()),this,SLOT(ClickedExitBtn()));
+    connect(_play,&QPushButton::clicked,this,&Menu::ClickedPlayBtn);
+    connect(_exit,&QPushButton::clicked,this,&Menu::ClickedExitBtn);
     this->setLayout(main_layout);
 }
 
@@ -513,9 +518,9 @@ SdkWindow::SdkWindow()
     _main_widget->addWidget(_m);
     _main_widget->addWidget(_sdk);
     _main_widget->setCurrentWidget(_m);
-    connect(_m,SIGNAL(Play(uint8_t)),this,SLOT(gotoSudoku(uint8_t)));
-    connect(_m,SIGNAL(Close()),this,SLOT(ClickedExitBtn()));
-    connect(_sdk,SIGNAL(ReturnToMenu()),this,SLOT(gotoMenu()));
+    connect(_m,&Menu::Play,this,&SdkWindow::gotoSudoku);
+    connect(_m,&Menu::Close,this,&SdkWindow::ClickedExitBtn);
+    connect(_sdk,&Sudoku::ReturnToMenu,this,&SdkWindow::gotoMenu);
     setCentralWidget(_main_widget);
     this->setMinimumSize(400,400);
     this->resize(400,400);
