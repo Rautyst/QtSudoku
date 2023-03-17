@@ -2,8 +2,8 @@
 
 CellBtn::CellBtn(QWidget* parent) :
     QPushButton("0",parent),
-    _digit(0),
-    _is_open(true)
+    _digit{0},
+    _is_open{true}
 {
     connect(this,&CellBtn::clicked,this,&CellBtn::ChangeDigit);
     this->setStyleSheet("background-color:"+QColor(255,255,255).name());
@@ -81,7 +81,10 @@ void CellBtn::UpdateColor()
 }
 
 Sudoku::Sudoku(QWidget* parent) :
-    QWidget(parent)
+    QWidget(parent),
+    _check{new QPushButton("Check",this)},
+    _solve{new QPushButton("Get Solve",this)},
+    _return{new QPushButton("Return to Menu",this)}
 {
     QGridLayout* main_layout = new QGridLayout(this);
     for (uint8_t i = 0; i < 9; i+=1)
@@ -95,12 +98,6 @@ Sudoku::Sudoku(QWidget* parent) :
     }
     main_layout->addItem(new QSpacerItem(30,30),3,3);
     main_layout->addItem(new QSpacerItem(30,30),7,7);
-    _check  = new QPushButton(this);
-    _solve  = new QPushButton(this);
-    _return = new QPushButton(this);
-    _check ->setText("Check");
-    _solve ->setText("Get Solve");
-    _return->setText("Return to Menu");
     connect(_solve ,&QPushButton::clicked,this,&Sudoku::Solve);
     connect(_check ,&QPushButton::clicked,this,&Sudoku::Check);
     connect(_return,&QPushButton::clicked,this,&Sudoku::ClickedReturnBtn);
@@ -191,54 +188,54 @@ void Sudoku::Generate(uint8_t open_slots_count)
 
     for (uint8_t row = 0; row < 9; )
     {
-        for (uint8_t line = 0; line < 9; )
+        for (uint8_t column = 0; column < 9; )
         {
-            for (uint8_t tmp_line = 0; tmp_line < line; tmp_line += 1)
+            for (uint8_t tmp_column = 0; tmp_column < column; tmp_column += 1)
             {
-                sdk[row][line]->RemoveFD(sdk[row][tmp_line]->GetDigit());
+                sdk[row][column]->RemoveFD(sdk[row][tmp_column]->GetDigit());
             }
             for (uint8_t tmp_row = 0; tmp_row < row; tmp_row += 1)
             {
-                sdk[row][line]->RemoveFD(sdk[tmp_row][line]->GetDigit());
+                sdk[row][column]->RemoveFD(sdk[tmp_row][column]->GetDigit());
             }
 
             for (uint8_t tmp_row = (row / 3) * 3; tmp_row < row; tmp_row += 1)
             {
-                for (uint8_t tmp_line = (line / 3) * 3; tmp_line < line; tmp_line += 1)
+                for (uint8_t tmp_column = (column / 3) * 3; tmp_column < column; tmp_column += 1)
                 {
-                    sdk[row][line]->RemoveFD(sdk[tmp_row][tmp_line]->GetDigit());
+                    sdk[row][column]->RemoveFD(sdk[tmp_row][tmp_column]->GetDigit());
                 }
             }
 
             {
                 int8_t tmp_row = row / 3 * 3;
-                int8_t tmp_line = line / 3 * 3;
-                while ((tmp_row != row) or (tmp_line != line))
+                int8_t tmp_column = column / 3 * 3;
+                while ((tmp_row != row) or (tmp_column != column))
                 {
-                    sdk[row][line]->RemoveFD(sdk[tmp_row][tmp_line]->GetDigit());
-                    tmp_line += 1;
-                    if (tmp_line >= line / 3 * 3 + 3)
+                    sdk[row][column]->RemoveFD(sdk[tmp_row][tmp_column]->GetDigit());
+                    tmp_column += 1;
+                    if (tmp_column >= column / 3 * 3 + 3)
                     {
                         tmp_row += 1;
-                        tmp_line = line / 3 * 3;
+                        tmp_column = column / 3 * 3;
                     }
                 }
             }
 
 
-            if (not sdk[row][line]->GenerateDigit())
+            if (not sdk[row][column]->GenerateDigit())
             {
-                sdk[row][line]->Reset();
-                if (line == 0)
+                sdk[row][column]->Reset();
+                if (column == 0)
                 {
                     row -= 1;
-                    line = 8;
+                    column = 8;
                 }
-                else line -= 1;
+                else column -= 1;
 
                 continue;
             }
-            line += 1;
+            column += 1;
         }
         row += 1;
     }
@@ -267,30 +264,30 @@ void Sudoku::Generate(uint8_t open_slots_count)
         }
         opened[true_num] = true;
     }
-    for (uint8_t line = 0; line < 9; line += 1)
+    for (uint8_t row = 0; row < 9; row += 1)
     {
-        for (uint8_t row = 0; row < 9; row += 1)
+        for (uint8_t column = 0; column < 9; column += 1)
         {
 
             bool t = true;
             for (uint8_t i = 0; i < open_slots_count; i += 1)
             {
-                if (opened[row + (line * 9)])
+                if (opened[column + (row * 9)])
                 {
-                    _cells[row][line]->SetDigit(sdk[row][line]->GetDigit());
-                    _cells[row][line]->Lock();
+                    _cells[row][column]->SetDigit(sdk[row][column]->GetDigit());
+                    _cells[row][column]->Lock();
                     t = false;
                     break;
                 }
             }
             if (t)
             {
-                _cells[row][line]->SetDigit(0);
-                _cells[row][line]->Open();
+                _cells[row][column]->SetDigit(0);
+                _cells[row][column]->Open();
             }
-            delete sdk[line][row];
+            delete sdk[row][column];
         }
-        delete[] sdk[line];
+        delete[] sdk[row];
     }
     delete[] opened;
     delete[] sdk;
@@ -468,7 +465,7 @@ void Sudoku::ClickedReturnBtn()
 
 void Sudoku::paintEvent(QPaintEvent*)
 {
-    QPainter painter(this); // Создаём объект отрисовщика
+    QPainter painter(this);
     painter.setPen(QPen(Qt::black, 3, Qt::SolidLine, Qt::FlatCap));
     painter.drawLine(0,(height()-_return->height())/3,width(),(height()-_return->height())/3);
     painter.drawLine(0,(height()-_return->height())/3*2,width(),(height()-_return->height())/3*2);
@@ -476,17 +473,16 @@ void Sudoku::paintEvent(QPaintEvent*)
     painter.drawLine(width()/3*2,0,width()/3*2,height());
 }
 
-Menu::Menu(QWidget *parent) : QWidget(parent)
+Menu::Menu(QWidget *parent) :
+    QWidget(parent),
+    _play{new QPushButton("Play!",this)},
+    _exit{new QPushButton("Exit",this)},
+    _setting{new QLineEdit(this)}
 {
     QGridLayout* main_layout = new QGridLayout(this);
-    _play    = new QPushButton(this);
-    _exit    = new QPushButton(this);
-    _setting = new QLineEdit  (this);
     main_layout->addWidget(_play,   1,1,1,1);
     main_layout->addWidget(_exit,   1,2,1,1);
     main_layout->addWidget(_setting,1,3,1,1);
-    _play   ->setText("Play!");
-    _exit   ->setText("Exit");
     _setting->setValidator(new QIntValidator(0, 100, this) );
     _setting->setAlignment(Qt::AlignmentFlag::AlignHCenter | Qt::AlignmentFlag::AlignVCenter);
     connect(_play,&QPushButton::clicked,this,&Menu::ClickedPlayBtn);
@@ -510,11 +506,11 @@ void Menu::ClickedExitBtn()
     emit Close();
 }
 
-SdkWindow::SdkWindow()
+SdkWindow::SdkWindow() :
+    _m{new Menu(this)},
+    _sdk{new Sudoku(this)},
+    _main_widget{new QStackedWidget(this)}
 {
-    _m           = new Menu(this);
-    _sdk         = new Sudoku(this);
-    _main_widget = new QStackedWidget(this);
     _main_widget->addWidget(_m);
     _main_widget->addWidget(_sdk);
     _main_widget->setCurrentWidget(_m);

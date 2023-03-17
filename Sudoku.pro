@@ -8,5 +8,3 @@ SOURCES += \
 
 HEADERS += \
     sudoku.h
-
-FORMS +=
