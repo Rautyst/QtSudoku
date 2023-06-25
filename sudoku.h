@@ -8,8 +8,11 @@
 #include <QGridLayout>
 #include <QDebug>
 #include <QPainter>
+#include <QPaintEvent>
 #include <QSpacerItem>
 #include <QIntValidator>
+#include <QTimer>
+#include <QLabel>
 
 class CellBtn : public QPushButton
 {
@@ -42,18 +45,29 @@ public:
 public slots:
     void Generate(uint8_t open_slots_count);
 private slots:
-    void Check();
     void Solve();
+    void Help();
     void ClickedReturnBtn();
+    void Check();
+
+    void Update();
 signals:
     void ReturnToMenu();
 private:
+    std::pair<int,int> FindError();
+
+    void resizeEvent(QResizeEvent *event) override;
     void paintEvent(QPaintEvent *) override;
 
     QPushButton* _check;
     QPushButton* _solve;
     QPushButton* _return;
+    QPushButton* _help;
     CellBtn* _cells[9][9];
+
+    QTimer* _timer;
+    uint16_t _seconds;
+    QLabel* _timer_lbl;
 };
 
 class Menu : public QWidget

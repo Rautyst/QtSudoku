@@ -82,9 +82,13 @@ void CellBtn::UpdateColor()
 
 Sudoku::Sudoku(QWidget* parent) :
     QWidget(parent),
-    _check{new QPushButton("Check",this)},
-    _solve{new QPushButton("Get Solve",this)},
-    _return{new QPushButton("Return to Menu",this)}
+    _check {new QPushButton("Check",this)},
+    _solve {new QPushButton("Get Solve",this)},
+    _return{new QPushButton("Return to Menu",this)},
+    _help{new QPushButton("Help",this)},
+    _timer{new QTimer(this)},
+    _seconds{0},
+    _timer_lbl{new QLabel("0 second later",this)}
 {
     QGridLayout* main_layout = new QGridLayout(this);
     for (uint8_t i = 0; i < 9; i+=1)
@@ -92,18 +96,29 @@ Sudoku::Sudoku(QWidget* parent) :
         for (uint8_t j = 0; j < 9; j+=1)
         {
             _cells[i][j] = new CellBtn(this);
-            _cells[i][j]->setSizePolicy ( QSizePolicy::Preferred, QSizePolicy::Preferred );
+            _cells[i][j]->setSizePolicy(QSizePolicy::Expanding , QSizePolicy::Expanding);
             main_layout->addWidget(_cells[i][j],i + i/3,j + j/3);
         }
     }
     main_layout->addItem(new QSpacerItem(30,30),3,3);
     main_layout->addItem(new QSpacerItem(30,30),7,7);
+    main_layout->addItem(new QSpacerItem(0,30),13,0);
     connect(_solve ,&QPushButton::clicked,this,&Sudoku::Solve);
     connect(_check ,&QPushButton::clicked,this,&Sudoku::Check);
     connect(_return,&QPushButton::clicked,this,&Sudoku::ClickedReturnBtn);
-    main_layout->addWidget(_solve ,13,0,1,3);
-    main_layout->addWidget(_return,13,8,1,3);
-    main_layout->addWidget(_check ,13,4,1,3);
+    main_layout->addWidget(_solve ,14,0,1,3);
+    main_layout->addWidget(_help ,14,4,1,3);
+    main_layout->addWidget(_return,14,8,1,3);
+    main_layout->addWidget(_check ,15,8,1,3);
+    main_layout->addWidget(_timer_lbl,15,0,1,7);
+
+    _check->setSizePolicy(QSizePolicy::Expanding , QSizePolicy::Expanding);
+
+    _timer_lbl->setAlignment(Qt::Alignment::enum_type::AlignCenter);
+
+    _timer->setTimerType(Qt::TimerType::VeryCoarseTimer);
+    connect(_timer,&QTimer::timeout,this,&Sudoku::Update);
+    _timer->start(1000);
 
     this->setLayout(main_layout);
     setWindowTitle("Sudoku");
@@ -176,15 +191,7 @@ public:
 
 void Sudoku::Generate(uint8_t open_slots_count)
 {
-    Cell*** sdk = new Cell**[9];
-    for (uint8_t i = 0; i < 9; i += 1)
-    {
-        sdk[i] = new Cell*[9] ;
-        for (uint8_t j = 0; j < 9; j += 1)
-        {
-            sdk[i][j] = new Cell;
-        }
-    }
+    Cell sdk[9][9];
 
     for (uint8_t row = 0; row < 9; )
     {
@@ -192,27 +199,20 @@ void Sudoku::Generate(uint8_t open_slots_count)
         {
             for (uint8_t tmp_column = 0; tmp_column < column; tmp_column += 1)
             {
-                sdk[row][column]->RemoveFD(sdk[row][tmp_column]->GetDigit());
+                sdk[row][column].RemoveFD(sdk[row][tmp_column].GetDigit());
             }
             for (uint8_t tmp_row = 0; tmp_row < row; tmp_row += 1)
             {
-                sdk[row][column]->RemoveFD(sdk[tmp_row][column]->GetDigit());
-            }
-
-            for (uint8_t tmp_row = (row / 3) * 3; tmp_row < row; tmp_row += 1)
-            {
-                for (uint8_t tmp_column = (column / 3) * 3; tmp_column < column; tmp_column += 1)
-                {
-                    sdk[row][column]->RemoveFD(sdk[tmp_row][tmp_column]->GetDigit());
-                }
+                sdk[row][column].RemoveFD(sdk[tmp_row][column].GetDigit());
             }
 
             {
                 int8_t tmp_row = row / 3 * 3;
                 int8_t tmp_column = column / 3 * 3;
-                while ((tmp_row != row) or (tmp_column != column))
+
+                while (not ((tmp_row == row) && (tmp_column == column)))
                 {
-                    sdk[row][column]->RemoveFD(sdk[tmp_row][tmp_column]->GetDigit());
+                    sdk[row][column].RemoveFD(sdk[tmp_row][tmp_column].GetDigit());
                     tmp_column += 1;
                     if (tmp_column >= column / 3 * 3 + 3)
                     {
@@ -223,9 +223,10 @@ void Sudoku::Generate(uint8_t open_slots_count)
             }
 
 
-            if (not sdk[row][column]->GenerateDigit())
+            if (not sdk[row][column].GenerateDigit())
             {
-                sdk[row][column]->Reset();
+                if ((row == 0) and (column == 0)) exit(-1);
+                sdk[row][column].Reset();
                 if (column == 0)
                 {
                     row -= 1;
@@ -240,7 +241,7 @@ void Sudoku::Generate(uint8_t open_slots_count)
         row += 1;
     }
 
-    bool* opened = new bool[9 * 9];
+    bool opened[9 * 9];
     for (uint8_t i = 0; i < 9 * 9; i += 1)
     {
         opened[i] = false;
@@ -274,7 +275,7 @@ void Sudoku::Generate(uint8_t open_slots_count)
             {
                 if (opened[column + (row * 9)])
                 {
-                    _cells[row][column]->SetDigit(sdk[row][column]->GetDigit());
+                    _cells[row][column]->SetDigit(sdk[row][column].GetDigit());
                     _cells[row][column]->Lock();
                     t = false;
                     break;
@@ -285,128 +286,57 @@ void Sudoku::Generate(uint8_t open_slots_count)
                 _cells[row][column]->SetDigit(0);
                 _cells[row][column]->Open();
             }
-            delete sdk[row][column];
-        }
-        delete[] sdk[row];
-    }
-    delete[] opened;
-    delete[] sdk;
-}
-
-void Sudoku::Check()
-{
-    bool** lines = new bool*[9];
-    bool** rows = new bool*[9];
-    bool** squares = new bool* [9];
-    for (uint8_t i = 0; i < 9; i+=1)
-    {
-        lines[i] = new bool[9];
-        rows[i] = new bool[9];
-        squares[i] = new bool[9];
-        for (uint8_t j = 0; j < 9; j += 1)
-        {
-            lines[i][j] = true;
-            rows[i][j] = true;
-            squares[i][j] = true;
         }
     }
-
-    bool flag = true;
-    for (uint8_t line = 0; (line < 9) and flag; line += 1)
-    {
-        for (uint8_t row = 0; (row < 9) and flag; row += 1)
-        {
-            if (_cells[row][line]->GetDigit() == 0)
-            {
-                _check->setStyleSheet("background-color: red;");
-                flag = false;
-                break;
-            }
-
-            if ((lines[line][_cells[row][line]->GetDigit()-1]) and (rows[row][_cells[row][line]->GetDigit()-1])
-                    and (squares[row / 3 + line / 3 * 3][_cells[row][line]->GetDigit() - 1]))
-            {
-                lines[line][_cells[row][line]->GetDigit() - 1] = false;
-                rows[row][_cells[row][line]->GetDigit() - 1] = false;
-                squares[row / 3 + line / 3 * 3][_cells[row][line]->GetDigit() - 1] = false;
-            }
-            else
-            {
-                _check->setStyleSheet("background-color: red;");
-                flag = false;
-                break;
-            }
-        }
-        if (not flag) break;
-    }
-    if (flag)
-    {
-        _check->setStyleSheet("background-color: green;");
-    }
-
-    for (uint8_t i = 0; i < 9; i += 1)
-    {
-        delete[] lines[i];
-        delete[] rows[i];
-    }
-    delete[] lines;
-    delete[] rows;
 }
 
 void Sudoku::Solve()
 {
     _solve->setText("u dirty cheater /(0\\_/0)\\");
 
-    Cell*** sdk = new Cell * *[9];
-    for (uint8_t i = 0; i < 9; i += 1) sdk[i] = new Cell * [9];
-    for (uint8_t i = 0; i < 9; i += 1)
-    {
-        for (uint8_t j = 0; j < 9; j += 1)
-        {
-            sdk[i][j] = new Cell{ 9 };
-        }
-    }
+    Cell sdk[9][9];
 
-    for (uint8_t row = 0; row < 9; )
+    for (int row = 0; row < 9; )
     {
-        for (uint8_t line = 0; line < 9; )
+        for (int line = 0; line < 9; )
         {
+            qDebug() << 1;
 
             if (_cells[row][line]->IsLocked())
             {
-                sdk[row][line]->SetDigit(_cells[row][line]->GetDigit());
+                sdk[row][line].SetDigit(_cells[row][line]->GetDigit());
                 line += 1;
                 continue;
             }
-            for (uint8_t tl = 0; tl < line; tl += 1)
+            for (int tl = 0; tl < line; tl += 1)
             {
-                sdk[row][line]->RemoveFD(sdk[row][tl]->GetDigit());
+                sdk[row][line].RemoveFD(sdk[row][tl].GetDigit());
             }
-            for (uint8_t tr = 0; tr < row; tr += 1)
+            for (int tr = 0; tr < row; tr += 1)
             {
-                sdk[row][line]->RemoveFD(sdk[tr][line]->GetDigit());
+                sdk[row][line].RemoveFD(sdk[tr][line].GetDigit());
             }
-            for (uint8_t tl = line+1; tl < 9; tl += 1)
+            for (int tl = line+1; tl < 9; tl += 1)
             {
                 if (_cells[row][tl]->IsLocked())
                 {
-                    sdk[row][line]->RemoveFD(_cells[row][tl]->GetDigit());
+                    sdk[row][line].RemoveFD(_cells[row][tl]->GetDigit());
                 }
             }
-            for (uint8_t tr = row+1; tr < 9; tr += 1)
+            for (int tr = row+1; tr < 9; tr += 1)
             {
                 if (_cells[tr][line]->IsLocked())
                 {
-                    sdk[row][line]->RemoveFD(_cells[tr][line]->GetDigit());
+                    sdk[row][line].RemoveFD(_cells[tr][line]->GetDigit());
                 }
             }
 
             {
-                int8_t tr = row / 3 * 3;
-                int8_t tl = line / 3 * 3;
+                int tr = row / 3 * 3;
+                int tl = line / 3 * 3;
                 while ((tr != row) or (tl != line))
                 {
-                    sdk[row][line]->RemoveFD(sdk[tr][tl]->GetDigit());
+                    sdk[row][line].RemoveFD(sdk[tr][tl].GetDigit());
                     tl += 1;
                     if (tl >= line / 3 * 3 + 3)
                     {
@@ -416,9 +346,9 @@ void Sudoku::Solve()
                 }
             }
 
-            if (not sdk[row][line]->GenerateDigit())
+            if (not sdk[row][line].GenerateDigit())
             {
-                sdk[row][line]->Reset();
+                sdk[row][line].Reset();
 
                 if (line == 0)
                 {
@@ -426,6 +356,13 @@ void Sudoku::Solve()
                     line = 9 -1;
                 }
                 else line -= 1;
+
+                if (row<0)
+                {
+                    _timer_lbl->setText("there are no solutions");
+                    _timer_lbl->setStyleSheet("color: red;");
+                    return;
+                }
 
                 while (_cells[row][line]->IsLocked())
                 {
@@ -437,6 +374,12 @@ void Sudoku::Solve()
                     }
                     else line -= 1;
 
+                    if (row<0)
+                    {
+                        _timer_lbl->setText("there are no solutions");
+                        _timer_lbl->setStyleSheet("color: red;");
+                        return;
+                    }
                 }
 
                 continue;
@@ -446,16 +389,27 @@ void Sudoku::Solve()
         row += 1;
     }
 
-    for (uint8_t row = 0; row < 9; row += 1)
+    for (int row = 0; row < 9; row += 1)
     {
-        for (uint8_t line = 0; line < 9; line += 1)
+        for (int line = 0; line < 9; line += 1)
         {
-            _cells[row][line]->SetDigit(sdk[row][line]->GetDigit());
-            delete sdk[row][line];
+            _cells[row][line]->SetDigit(sdk[row][line].GetDigit());
         }
     }
-    for (uint8_t i = 0; i < 9; i += 1) delete[] sdk[i];
-    delete[] sdk;
+}
+
+void Sudoku::Help()
+{
+    auto err = FindError();
+    qDebug() << err;
+    if (err == std::make_pair<int,int>(-1,-1))
+    {
+        _check->setStyleSheet("background-color: green;");
+    }
+    else
+    {
+        _cells[err.first][err.second]->setStyleSheet(_cells[err.first][err.second]->styleSheet() + "border: 15px solid rgb(0,200,250);");
+    }
 }
 
 void Sudoku::ClickedReturnBtn()
@@ -463,14 +417,82 @@ void Sudoku::ClickedReturnBtn()
     emit ReturnToMenu();
 }
 
-void Sudoku::paintEvent(QPaintEvent*)
+void Sudoku::Check()
 {
+    if (FindError() == std::make_pair<int,int>(-1,-1)) {
+         _check->setStyleSheet("background-color: red;");
+    }
+    else _check->setStyleSheet("background-color: green;");
+}
+
+void Sudoku::Update()
+{
+    _seconds += 1;
+    _timer_lbl->setText(QString::number(_seconds) + " second later");
+    if (_check->styleSheet() == "background-color: red;") _check->setStyleSheet("");
+}
+
+std::pair<int, int> Sudoku::FindError()
+{
+    bool columns [9][9];
+    bool rows [9][9];;
+    bool squares [9][9];
+    for (int i = 0; i < 9; i+=1)
+    {
+        for (int j = 0; j < 9; j += 1)
+        {
+            columns[i][j] = true;
+            rows[i][j] = true;
+            squares[i][j] = true;
+        }
+    }
+
+    for (int column = 0; column < 9; column += 1)
+    {
+        for (int row = 0; row < 9; row += 1)
+        {
+            if (_cells[row][column]->GetDigit() == 0)
+            {
+                return {column,row};
+            }
+
+            if ((columns[column][_cells[row][column]->GetDigit()-1]) and (rows[row][_cells[row][column]->GetDigit()-1])
+                    and (squares[row / 3 + column / 3 * 3][_cells[row][column]->GetDigit() - 1]))
+            {
+                columns[column][_cells[row][column]->GetDigit() - 1] = false;
+                rows[row][_cells[row][column]->GetDigit() - 1] = false;
+                squares[row / 3 + column / 3 * 3][_cells[row][column]->GetDigit() - 1] = false;
+            }
+            else
+            {
+                return {column,row};
+            }
+        }
+    }
+
+    return {-1,-1};
+}
+
+void Sudoku::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    QFont tmp;
+    tmp.setPixelSize(_timer_lbl->height()/2);
+    _timer_lbl->setFont(tmp);
+}
+
+void Sudoku::paintEvent(QPaintEvent* event)
+{
+    QWidget::paintEvent(event);
     QPainter painter(this);
     painter.setPen(QPen(Qt::black, 3, Qt::SolidLine, Qt::FlatCap));
-    painter.drawLine(0,(height()-_return->height())/3,width(),(height()-_return->height())/3);
-    painter.drawLine(0,(height()-_return->height())/3*2,width(),(height()-_return->height())/3*2);
-    painter.drawLine(width()/3,0,width()/3,height());
-    painter.drawLine(width()/3*2,0,width()/3*2,height());
+    painter.setRenderHint(QPainter::Antialiasing);
+    int sdk_table_height = (height()-_return->height()-_check->height()-30);
+    painter.drawLine(0,sdk_table_height/3,width(),sdk_table_height/3);
+    painter.drawLine(0,sdk_table_height/3*2,width(),sdk_table_height/3*2);
+    painter.drawLine(0,sdk_table_height,width(),sdk_table_height);
+    painter.drawLine(width()/3,0,width()/3,sdk_table_height);
+    painter.drawLine(width()/3*2,0,width()/3*2,sdk_table_height);
 }
 
 Menu::Menu(QWidget *parent) :
@@ -492,7 +514,7 @@ Menu::Menu(QWidget *parent) :
 
 void Menu::ClickedPlayBtn()
 {
-    uint8_t setting = _setting->text().toInt();
+    int setting = _setting->text().toInt();
     if (setting > 81)
     {
         qWarning() << ">81!? srsly?";
