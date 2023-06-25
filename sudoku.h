@@ -20,9 +20,9 @@ class CellBtn : public QPushButton
 public:
     CellBtn(QWidget* parent = 0);
 
-    uint8_t GetDigit() const;
+    int GetDigit() const;
     bool IsLocked() const;
-    void SetDigit(uint8_t digit);
+    void SetDigit(int digit);
     void Lock();
     void Open();
 
@@ -33,7 +33,7 @@ private:
     void resizeEvent(QResizeEvent *event) override;
     void UpdateColor();
 
-    uint8_t _digit;
+    int _digit;
     bool _is_open;
 };
 
@@ -43,7 +43,7 @@ class Sudoku : public QWidget
 public:
     Sudoku(QWidget* parent);
 public slots:
-    void Generate(uint8_t open_slots_count);
+    void Generate(int open_slots_count);
 private slots:
     void Solve();
     void Help();
@@ -83,7 +83,7 @@ private slots:
     void ClickedPlayBtn();
     void ClickedExitBtn();
 signals:
-    void Play(uint8_t setting);
+    void Play(int setting);
     void Close();
 };
 
@@ -98,7 +98,7 @@ private:
     QStackedWidget* _main_widget;
 private slots:
     void gotoMenu();
-    void gotoSudoku(uint8_t setting);
+    void gotoSudoku(int setting);
     void ClickedExitBtn();
 signals:
     void Close();

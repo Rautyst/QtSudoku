@@ -9,7 +9,7 @@ CellBtn::CellBtn(QWidget* parent) :
     this->setStyleSheet("background-color:"+QColor(255,255,255).name());
 }
 
-uint8_t CellBtn::GetDigit() const
+int CellBtn::GetDigit() const
 {
     return _digit;
 }
@@ -19,7 +19,7 @@ bool CellBtn::IsLocked() const
     return !_is_open;
 }
 
-void CellBtn::SetDigit(const uint8_t digit)
+void CellBtn::SetDigit(const int digit)
 {
     _digit = digit;
     setText(QString::number(_digit));
@@ -91,9 +91,9 @@ Sudoku::Sudoku(QWidget* parent) :
     _timer_lbl{new QLabel("0 second later",this)}
 {
     QGridLayout* main_layout = new QGridLayout(this);
-    for (uint8_t i = 0; i < 9; i+=1)
+    for (int i = 0; i < 9; i+=1)
     {
-        for (uint8_t j = 0; j < 9; j+=1)
+        for (int j = 0; j < 9; j+=1)
         {
             _cells[i][j] = new CellBtn(this);
             _cells[i][j]->setSizePolicy(QSizePolicy::Expanding , QSizePolicy::Expanding);
@@ -128,46 +128,40 @@ Sudoku::Sudoku(QWidget* parent) :
 class Cell
 {
 private:
-    bool* _free_digits;
-    uint8_t _digit; // 0 - нет числа
+    bool _free_digits[9];
+    int _digit; // 0 - нет числа
 public:
-    Cell(const uint8_t digit = 0)
+    Cell(const int digit = 0)
     {
         _digit = digit;
-        _free_digits = new bool[9];
-        for (uint8_t i = 0; i < 9; i += 1) _free_digits[i] = true; // изначально все свободны
-    }
-
-    ~Cell()
-    {
-        delete[] _free_digits;
+        for (int i = 0; i < 9; i += 1) _free_digits[i] = true; // изначально все свободны
     }
 
     void Reset()
     {
-        for (uint8_t i = 0; i < 9; i += 1) _free_digits[i] = true; // изначально все свободны
+        for (int i = 0; i < 9; i += 1) _free_digits[i] = true; // изначально все свободны
         _digit = 0;
     }
 
-    uint8_t GetDigit()
+    int GetDigit()
     {
         return _digit;
     }
 
-    void RemoveFD(uint8_t digit)
+    void RemoveFD(int digit)
     {
         _free_digits[digit - 1] = false;
     }
 
     bool GenerateDigit()
     {
-        uint8_t fd_count = 0;
-        for (uint8_t i = 0; i < 9; i += 1) fd_count += _free_digits[i];
+        int fd_count = 0;
+        for (int i = 0; i < 9; i += 1) fd_count += _free_digits[i];
 
         if (fd_count == 0) return false;
 
-        uint8_t tmp = rand() % fd_count;
-        uint8_t true_num = 0;
+        int tmp = rand() % fd_count;
+        int true_num = 0;
         while (true)
         {
             if (_free_digits[true_num])
@@ -183,32 +177,32 @@ public:
         return true;
     }
 
-    void SetDigit(uint8_t digit)
+    void SetDigit(int digit)
     {
         _digit = digit;
     }
 };
 
-void Sudoku::Generate(uint8_t open_slots_count)
+void Sudoku::Generate(int open_slots_count)
 {
     Cell sdk[9][9];
 
-    for (uint8_t row = 0; row < 9; )
+    for (int row = 0; row < 9; )
     {
-        for (uint8_t column = 0; column < 9; )
+        for (int column = 0; column < 9; )
         {
-            for (uint8_t tmp_column = 0; tmp_column < column; tmp_column += 1)
+            for (int tmp_column = 0; tmp_column < column; tmp_column += 1)
             {
                 sdk[row][column].RemoveFD(sdk[row][tmp_column].GetDigit());
             }
-            for (uint8_t tmp_row = 0; tmp_row < row; tmp_row += 1)
+            for (int tmp_row = 0; tmp_row < row; tmp_row += 1)
             {
                 sdk[row][column].RemoveFD(sdk[tmp_row][column].GetDigit());
             }
 
             {
-                int8_t tmp_row = row / 3 * 3;
-                int8_t tmp_column = column / 3 * 3;
+                int tmp_row = row / 3 * 3;
+                int tmp_column = column / 3 * 3;
 
                 while (not ((tmp_row == row) && (tmp_column == column)))
                 {
@@ -242,15 +236,15 @@ void Sudoku::Generate(uint8_t open_slots_count)
     }
 
     bool opened[9 * 9];
-    for (uint8_t i = 0; i < 9 * 9; i += 1)
+    for (int i = 0; i < 9 * 9; i += 1)
     {
         opened[i] = false;
     }
 
-    for (uint8_t i = 0; i < open_slots_count; i += 1)
+    for (int i = 0; i < open_slots_count; i += 1)
     {
-        uint8_t tmp = rand() % (9 * 9 - i);
-        uint8_t true_num = 0;
+        int tmp = rand() % (9 * 9 - i);
+        int true_num = 0;
         while (true)
         {
             if (not opened[true_num])
@@ -265,13 +259,13 @@ void Sudoku::Generate(uint8_t open_slots_count)
         }
         opened[true_num] = true;
     }
-    for (uint8_t row = 0; row < 9; row += 1)
+    for (int row = 0; row < 9; row += 1)
     {
-        for (uint8_t column = 0; column < 9; column += 1)
+        for (int column = 0; column < 9; column += 1)
         {
 
             bool t = true;
-            for (uint8_t i = 0; i < open_slots_count; i += 1)
+            for (int i = 0; i < open_slots_count; i += 1)
             {
                 if (opened[column + (row * 9)])
                 {
@@ -298,64 +292,82 @@ void Sudoku::Solve()
 
     for (int row = 0; row < 9; )
     {
-        for (int line = 0; line < 9; )
+        for (int column = 0; column < 9; )
         {
-            qDebug() << 1;
+            qDebug() << column << ' ' << row;
 
-            if (_cells[row][line]->IsLocked())
+            if (_cells[row][column]->IsLocked())
             {
-                sdk[row][line].SetDigit(_cells[row][line]->GetDigit());
-                line += 1;
+                sdk[row][column].SetDigit(_cells[row][column]->GetDigit());
+                column += 1;
                 continue;
             }
-            for (int tl = 0; tl < line; tl += 1)
+            for (int tmp_column = 0; tmp_column < column; tmp_column += 1)
             {
-                sdk[row][line].RemoveFD(sdk[row][tl].GetDigit());
+                sdk[row][column].RemoveFD(sdk[row][tmp_column].GetDigit());
             }
-            for (int tr = 0; tr < row; tr += 1)
+            for (int tmp_row = 0; tmp_row < row; tmp_row += 1)
             {
-                sdk[row][line].RemoveFD(sdk[tr][line].GetDigit());
+                sdk[row][column].RemoveFD(sdk[tmp_row][column].GetDigit());
             }
-            for (int tl = line+1; tl < 9; tl += 1)
+            for (int tmp_column = column+1; tmp_column < 9; tmp_column += 1)
             {
-                if (_cells[row][tl]->IsLocked())
+                if (_cells[row][tmp_column]->IsLocked())
                 {
-                    sdk[row][line].RemoveFD(_cells[row][tl]->GetDigit());
+                    sdk[row][column].RemoveFD(_cells[row][tmp_column]->GetDigit());
                 }
             }
-            for (int tr = row+1; tr < 9; tr += 1)
+            for (int tmp_row = row+1; tmp_row < 9; tmp_row += 1)
             {
-                if (_cells[tr][line]->IsLocked())
+                if (_cells[tmp_row][column]->IsLocked())
                 {
-                    sdk[row][line].RemoveFD(_cells[tr][line]->GetDigit());
+                    sdk[row][column].RemoveFD(_cells[tmp_row][column]->GetDigit());
                 }
             }
 
             {
-                int tr = row / 3 * 3;
-                int tl = line / 3 * 3;
-                while ((tr != row) or (tl != line))
+                int tmp_row = row / 3 * 3;
+                int tmp_column = column / 3 * 3;
+                while (not ((tmp_row == row) and (tmp_column == column)))
                 {
-                    sdk[row][line].RemoveFD(sdk[tr][tl].GetDigit());
-                    tl += 1;
-                    if (tl >= line / 3 * 3 + 3)
+                    sdk[row][column].RemoveFD(sdk[tmp_row][tmp_column].GetDigit());
+                    tmp_column += 1;
+                    if (tmp_column >= column / 3 * 3 + 3)
                     {
-                        tr += 1;
-                        tl = line / 3 * 3;
+                        tmp_row += 1;
+                        tmp_column = column / 3 * 3;
                     }
                 }
             }
 
-            if (not sdk[row][line].GenerateDigit())
             {
-                sdk[row][line].Reset();
+                int tmp_row = row / 3 * 3 + 2;
+                int tmp_column = column / 3 * 3 + 2;
+                while (not ((tmp_row == row) and (tmp_column == column)))
+                {
+                    if (_cells[tmp_row][tmp_column]->IsLocked())
+                    {
+                        sdk[row][column].RemoveFD(sdk[tmp_row][tmp_column].GetDigit());
+                    }
+                    tmp_column -= 1;
+                    if (tmp_column < column / 3 * 3)
+                    {
+                        tmp_row -= 1;
+                        tmp_column = column / 3 * 3 + 2;
+                    }
+                }
+            }
 
-                if (line == 0)
+            if (not sdk[row][column].GenerateDigit())
+            {
+                sdk[row][column].Reset();
+
+                if (column == 0)
                 {
                     row -= 1;
-                    line = 9 -1;
+                    column = 9 -1;
                 }
-                else line -= 1;
+                else column -= 1;
 
                 if (row<0)
                 {
@@ -364,15 +376,15 @@ void Sudoku::Solve()
                     return;
                 }
 
-                while (_cells[row][line]->IsLocked())
+                while (_cells[row][column]->IsLocked())
                 {
 
-                    if (line == 0)
+                    if (column == 0)
                     {
                         row -= 1;
-                        line = 9 - 1;
+                        column = 9 - 1;
                     }
-                    else line -= 1;
+                    else column -= 1;
 
                     if (row<0)
                     {
@@ -384,16 +396,16 @@ void Sudoku::Solve()
 
                 continue;
             }
-            line += 1;
+            column += 1;
         }
         row += 1;
     }
 
     for (int row = 0; row < 9; row += 1)
     {
-        for (int line = 0; line < 9; line += 1)
+        for (int column = 0; column < 9; column += 1)
         {
-            _cells[row][line]->SetDigit(sdk[row][line].GetDigit());
+            _cells[row][column]->SetDigit(sdk[row][column].GetDigit());
         }
     }
 }
@@ -549,7 +561,7 @@ void SdkWindow::gotoMenu()
     _main_widget->setCurrentWidget(_m);
 }
 
-void SdkWindow::gotoSudoku(uint8_t setting)
+void SdkWindow::gotoSudoku(int setting)
 {
     _sdk->Generate(setting);
     _main_widget->setCurrentWidget(_sdk);
