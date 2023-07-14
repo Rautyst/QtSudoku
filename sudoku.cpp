@@ -16,7 +16,7 @@ int CellBtn::GetDigit() const
 
 bool CellBtn::IsLocked() const
 {
-    return !_is_open;
+    return not _is_open;
 }
 
 void CellBtn::SetDigit(const int digit)
@@ -31,7 +31,6 @@ void CellBtn::Lock()
     if (_is_open)
     {
         _is_open = false;
-        setEnabled(false);
         UpdateColor();
     }
 }
@@ -41,13 +40,14 @@ void CellBtn::Open()
     if (not _is_open)
     {
         _is_open = true;
-        setEnabled(true);
         UpdateColor();
     }
 }
 
 void CellBtn::ChangeDigit()
 {
+    if (not _is_open) return;
+
     _digit += 1;
     if (_digit == 10)
     {
@@ -55,6 +55,16 @@ void CellBtn::ChangeDigit()
     }
     setText(QString::number(_digit));
     UpdateColor();
+}
+
+void CellBtn::mousePressEvent(QMouseEvent* event)
+{
+    if ((event->button() == Qt::RightButton) and Sudoku::IsSandboxMode())
+    {
+        if (_is_open) Lock();
+        else Open();
+    }
+    QPushButton::mousePressEvent(event);
 }
 
 void CellBtn::resizeEvent(QResizeEvent*)
@@ -106,6 +116,7 @@ Sudoku::Sudoku(QWidget* parent) :
     connect(_solve ,&QPushButton::clicked,this,&Sudoku::Solve);
     connect(_check ,&QPushButton::clicked,this,&Sudoku::Check);
     connect(_return,&QPushButton::clicked,this,&Sudoku::ClickedReturnBtn);
+    connect(_help,&QPushButton::clicked,this,&Sudoku::Help);
     main_layout->addWidget(_solve ,14,0,1,3);
     main_layout->addWidget(_help ,14,4,1,3);
     main_layout->addWidget(_return,14,8,1,3);
@@ -118,10 +129,14 @@ Sudoku::Sudoku(QWidget* parent) :
 
     _timer->setTimerType(Qt::TimerType::VeryCoarseTimer);
     connect(_timer,&QTimer::timeout,this,&Sudoku::Update);
-    _timer->start(1000);
 
     this->setLayout(main_layout);
     setWindowTitle("Sudoku");
+}
+
+bool Sudoku::IsSandboxMode()
+{
+    return _sandbox_mode;
 }
 
 // Данный класс нужен только для того, чтобы создавать и решать судоку
@@ -235,7 +250,7 @@ void Sudoku::Generate(int open_slots_count)
         row += 1;
     }
 
-    bool opened[9 * 9];
+    static bool opened[9 * 9];
     for (int i = 0; i < 9 * 9; i += 1)
     {
         opened[i] = false;
@@ -282,11 +297,70 @@ void Sudoku::Generate(int open_slots_count)
             }
         }
     }
+
+    _sandbox_mode = not open_slots_count;
+    _open_slots_count = open_slots_count;
+
+    if (_sandbox_mode)
+    {
+        _timer_lbl->setText("SANDBOX MODE. Use right-click to open/close cells.");
+    }
+    else
+    {
+        _seconds = 0;
+        _timer_lbl->setText("0 seconds later");
+        _timer->start(1000);
+    }
 }
 
 void Sudoku::Solve()
 {
     _solve->setText("u dirty cheater /(0\\_/0)\\");
+
+    bool columns [9][9];
+    bool rows [9][9];;
+    bool squares [9][9];
+    for (int i = 0; i < 9; i+=1)
+    {
+        for (int j = 0; j < 9; j += 1)
+        {
+            columns[i][j] = true;
+            rows[i][j] = true;
+            squares[i][j] = true;
+        }
+    }
+
+    for (int column = 0; column < 9; column += 1)
+    {
+        for (int row = 0; row < 9; row += 1)
+        {
+            if (not _cells[row][column]->IsLocked())
+            {
+                continue;
+            }
+
+            if (_cells[row][column]->GetDigit() == 0)
+            {
+                _timer_lbl->setText("there are no solutions");
+                _timer_lbl->setStyleSheet("color: red;");
+                return;
+            }
+
+            if ((columns[column][_cells[row][column]->GetDigit()-1]) and (rows[row][_cells[row][column]->GetDigit()-1])
+                    and (squares[row / 3 + column / 3 * 3][_cells[row][column]->GetDigit() - 1]))
+            {
+                columns[column][_cells[row][column]->GetDigit() - 1] = false;
+                rows[row][_cells[row][column]->GetDigit() - 1] = false;
+                squares[row / 3 + column / 3 * 3][_cells[row][column]->GetDigit() - 1] = false;
+            }
+            else
+            {
+                _timer_lbl->setText("there are no solutions");
+                _timer_lbl->setStyleSheet("color: red;");
+                return;
+            }
+        }
+    }
 
     Cell sdk[9][9];
 
@@ -294,8 +368,6 @@ void Sudoku::Solve()
     {
         for (int column = 0; column < 9; )
         {
-            qDebug() << column << ' ' << row;
-
             if (_cells[row][column]->IsLocked())
             {
                 sdk[row][column].SetDigit(_cells[row][column]->GetDigit());
@@ -413,14 +485,13 @@ void Sudoku::Solve()
 void Sudoku::Help()
 {
     auto err = FindError();
-    qDebug() << err;
     if (err == std::make_pair<int,int>(-1,-1))
     {
         _check->setStyleSheet("background-color: green;");
     }
     else
     {
-        _cells[err.first][err.second]->setStyleSheet(_cells[err.first][err.second]->styleSheet() + "border: 15px solid rgb(0,200,250);");
+        _cells[err.first][err.second]->setStyleSheet(_cells[err.first][err.second]->styleSheet() + ";border: 2px solid rgb(0,200,250);");
     }
 }
 
@@ -432,9 +503,22 @@ void Sudoku::ClickedReturnBtn()
 void Sudoku::Check()
 {
     if (FindError() == std::make_pair<int,int>(-1,-1)) {
-         _check->setStyleSheet("background-color: red;");
+        _check->setStyleSheet("background-color: green;");
+        if (not _sandbox_mode)
+        {
+            _timer->stop();
+            QFile file("base.txt");
+            QString result = "Won in " + QString::number(_seconds) + " seconds Sudoku with "
+                    + QString::number(_open_slots_count) +  " open cells";
+            if (file.open(QIODevice::Append)) {
+                QTextStream out(&file);
+                out << result << Qt::endl;
+            }
+            file.close();
+            _sandbox_mode = true;
+        }
     }
-    else _check->setStyleSheet("background-color: green;");
+    else _check->setStyleSheet("background-color: red;");
 }
 
 void Sudoku::Update()
@@ -446,9 +530,9 @@ void Sudoku::Update()
 
 std::pair<int, int> Sudoku::FindError()
 {
-    bool columns [9][9];
-    bool rows [9][9];;
-    bool squares [9][9];
+    static bool columns [9][9];
+    static bool rows [9][9];;
+    static bool squares [9][9];
     for (int i = 0; i < 9; i+=1)
     {
         for (int j = 0; j < 9; j += 1)
@@ -465,7 +549,7 @@ std::pair<int, int> Sudoku::FindError()
         {
             if (_cells[row][column]->GetDigit() == 0)
             {
-                return {column,row};
+                return {row, column};
             }
 
             if ((columns[column][_cells[row][column]->GetDigit()-1]) and (rows[row][_cells[row][column]->GetDigit()-1])
@@ -477,7 +561,7 @@ std::pair<int, int> Sudoku::FindError()
             }
             else
             {
-                return {column,row};
+                return {row, column};
             }
         }
     }

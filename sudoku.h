@@ -13,12 +13,13 @@
 #include <QIntValidator>
 #include <QTimer>
 #include <QLabel>
+#include <QFile>
 
 class CellBtn : public QPushButton
 {
     Q_OBJECT
 public:
-    CellBtn(QWidget* parent = 0);
+    CellBtn(QWidget* parent);
 
     int GetDigit() const;
     bool IsLocked() const;
@@ -30,7 +31,8 @@ private slots:
     void ChangeDigit();
 
 private:
-    void resizeEvent(QResizeEvent *event) override;
+    void mousePressEvent(QMouseEvent*) override;
+    void resizeEvent(QResizeEvent*) override;
     void UpdateColor();
 
     int _digit;
@@ -42,6 +44,8 @@ class Sudoku : public QWidget
     Q_OBJECT
 public:
     Sudoku(QWidget* parent);
+
+    static bool IsSandboxMode();
 public slots:
     void Generate(int open_slots_count);
 private slots:
@@ -68,6 +72,9 @@ private:
     QTimer* _timer;
     uint16_t _seconds;
     QLabel* _timer_lbl;
+
+    static inline bool _sandbox_mode = false;
+    int _open_slots_count;
 };
 
 class Menu : public QWidget
